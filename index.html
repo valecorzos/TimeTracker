@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agenda de Actividades</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght=400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue: #1067f2;
+      --blue-deep: #1f3568;
+      --mist: #f7f9fd;
+      --surface: #ffffff;
+      --line: #e5eaf3;
+      --muted: #7b89a3;
+      --ink: #1e2e5a;
+      --pink: #e05a81;
+      --success: #159762;
+      --danger: #ce4050;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      width: 100%;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      font-family: "DM Sans", sans-serif;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: 3px solid rgba(16, 103, 242, .25);
+      outline-offset: 2px;
+    }
+
+    .agenda-shell {
+      width: 100%;
+      min-height: 100vh;
+      background: radial-gradient(circle at 91% 3%, rgba(16, 103, 242, .11), transparent 25rem), var(--mist);
+    }
+
+    .agenda-header {
+      width: 100%;
+      background: rgba(255, 255, 255, .96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .workspace {
+      width: 100%;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 28px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border-radius: 13px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--blue-deep));
+      box-shadow: 0 10px 22px rgba(16, 103, 242, .22);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .date-strip {
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 8px 20px rgba(30, 46, 90, .05);
+    }
+
+    .day-button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 58px;
+      height: 60px;
+      border: 1px solid #dce4f0;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      transition: all .2s ease;
+      flex-shrink: 0;
+    }
+
+    .day-button:hover {
+      border-color: var(--blue);
+      background: #edf4ff;
+    }
+
+    .day-button.active {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 8px 15px rgba(16, 103, 242, .2);
+    }
+
+    .day-name {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .day-num {
+      margin-top: 2px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .agenda-panel {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 10px 24px rgba(30, 46, 90, .055);
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .person-avatar, .project-icon {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      place-items: center;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .juan-avatar { background: linear-gradient(135deg, #1067f2, #1f3568); }
+    .valentina-avatar { background: linear-gradient(135deg, #e05a81, #9d3653); }
+    .project-icon { background: linear-gradient(135deg, #159762, #1f7d68); }
+
+    .count-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 9px;
+      border-radius: 999px;
+      color: var(--muted);
+      background: #f2f5fa;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .entry-list, .project-list {
+      display: grid;
+      gap: 10px;
+      padding: 16px 20px;
+    }
+
+    .entry-list { min-height: 112px; }
+
+    .entry-card, .project-card {
+      border: 1px solid #e7ecf5;
+      border-radius: 12px;
+      background: #fff;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .entry-card { padding: 13px; }
+    .project-card { padding: 13px; }
+
+    .entry-card:hover, .project-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(30, 46, 90, .06);
+    }
+
+    .category-badge, .status-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .category-formulario { color: #2853a7; background: #eaf2ff; }
+    .category-procedimiento { color: #197d57; background: #e4f8ef; }
+    .category-desarrollo { color: #9a5a11; background: #fff2dc; }
+    .category-diseno { color: #a63262; background: #fdeaf1; }
+    .category-automatizacion { color: #6b21a8; background: #f3e8ff; }
+    .category-frontend { color: #0369a1; background: #e0f2fe; }
+    .category-backend { color: #b45309; background: #fef3c7; }
+
+    .status-planificacion { color: #2853a7; background: #eaf2ff; }
+    .status-en-progreso { color: #9a5a11; background: #fff2dc; }
+    .status-completado { color: #197d57; background: #e4f8ef; }
+    .status-pausado { color: #7b5d8a; background: #f4ebfb; }
+
+    .icon-button {
+      display: inline-grid;
+      width: 31px;
+      height: 31px;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      color: #71809d;
+      background: transparent;
+      transition: .2s ease;
+    }
+
+    .icon-button:hover {
+      color: var(--blue);
+      background: #edf4ff;
+    }
+
+    .agenda-form, .project-form {
+      padding: 18px 20px 20px;
+      border-top: 1px solid var(--line);
+      background: #fbfcff;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    .control {
+      width: 100%;
+      min-height: 41px;
+      border: 1px solid #dce4f0;
+      border-radius: 8px;
+      padding: 0 11px;
+      color: var(--ink);
+      background: #fff;
+      font-size: 12px;
+    }
+
+    textarea.control {
+      min-height: 88px;
+      padding: 10px 11px;
+      resize: vertical;
+    }
+
+    .primary-button, .secondary-button {
+      display: inline-flex;
+      min-height: 39px;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border-radius: 8px;
+      padding: 0 13px;
+      font-size: 12px;
+      font-weight: 700;
+      transition: .2s ease;
+    }
+
+    .primary-button {
+      border: 0;
+      color: #fff;
+      background: var(--blue);
+      box-shadow: 0 7px 15px rgba(16, 103, 242, .18);
+    }
+
+    .pink-button {
+      background: var(--pink);
+      box-shadow: 0 7px 15px rgba(224, 90, 129, .18);
+    }
+
+    .green-button {
+      background: var(--success);
+      box-shadow: 0 7px 15px rgba(21, 151, 98, .18);
+    }
+
+    .primary-button:hover { transform: translateY(-1px); filter: brightness(.94); }
+
+    .secondary-button {
+      border: 1px solid #d9e3f3;
+      color: #566681;
+      background: #fff;
+    }
+
+    .primary-button:disabled,
+    .secondary-button:disabled,
+    .icon-button:disabled {
+      cursor: not-allowed;
+      opacity: .62;
+      transform: none;
+    }
+
+    .empty-state {
+      display: grid;
+      min-height: 102px;
+      place-items: center;
+      margin: 0 20px 16px;
+      padding: 18px;
+      border: 1px dashed #dbe4f2;
+      border-radius: 12px;
+      color: var(--muted);
+      background: #fbfcff;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 16px 20px 20px;
+    }
+
+    .metric-card {
+      min-width: 0;
+      padding: 13px;
+      border: 1px solid #e7ecf5;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #fbfdff, #f5f8fd);
+    }
+
+    .metric-value {
+      margin-top: 5px;
+      color: var(--ink);
+      font-size: 23px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 7px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8eef8;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #1067f2, #45a4ff);
+      transition: width .3s ease;
+    }
+
+    .project-progress-text {
+      color: #62718c;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .toast {
+      min-height: 17px;
+      margin: 11px 0 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .toast.success { color: var(--success); }
+    .toast.error { color: var(--danger); }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 720px) {
+      .workspace { padding: 0 16px; }
+      .panel-heading, .entry-list, .project-list, .agenda-form, .project-form, .dashboard-grid { padding-left: 16px; padding-right: 16px; }
+      .empty-state { margin-left: 16px; margin-right: 16px; }
+    }
+  </style>
+ </head>
+ <body data-template-id="__page-root" style="background: rgb(247, 249, 253);">
+  <div class="agenda-shell">
+   <header class="agenda-header" style="background: rgb(255, 255, 255);">
+    <div class="workspace flex min-h-[76px] items-center justify-between gap-5">
+     <div class="flex min-w-0 items-center gap-3">
+      <div class="brand-mark" aria-hidden="true">A</div>
+      <div class="min-w-0">
+       <h1 class="canva-text m-0 font-bold tracking-tight" style="color: rgb(30, 46, 90); font-weight: 700; font-size: 28px;">Agenda de Actividades</h1>
+       <p class="canva-text m-0 mt-1 text-[11px]" style="color: rgb(129, 144, 170); font-size: 11px;">Registra el trabajo diario y visualiza el avance de los proyectos.</p>
+      </div>
+     </div>
+     <span class="canva-tag shrink-0 rounded-full px-3 py-1 text-[10px] font-bold sm:inline-flex" style="background: rgb(229, 251, 241); color: rgb(21, 151, 98);">Agenda compartida</span>
+    </div>
+   </header>
+   
+   <main class="workspace pb-10 pt-5">
+    <section class="date-strip p-4" aria-labelledby="date-heading" style="background: rgb(255, 255, 255);">
+     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+       <p class="canva-text m-0 text-[9px] font-bold uppercase tracking-[.13em]" style="color: rgb(114, 129, 158); font-size: 9px;">Vista diaria</p>
+       <h2 id="date-heading" class="canva-text m-0 mt-1 font-bold tracking-tight" style="color: rgb(30, 46, 90); font-size: 21px;">Selecciona el día de trabajo</h2>
+      </div>
+      <p id="selected-date-label" class="m-0 text-[11px] font-semibold text-[#65738e]" aria-live="polite"></p>
+     </div>
+     <div id="day-carousel" class="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="Carrusel de fechas"></div>
+    </section>
+
+    <section class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2" aria-label="Agendas diarias">
+      
+      <article class="canva-panel agenda-panel" aria-labelledby="juan-heading" style="background: rgb(255, 255, 255);">
+       <header class="panel-heading">
+        <div class="flex min-w-0 items-center gap-3">
+         <div class="person-avatar juan-avatar" aria-hidden="true">JC</div>
+         <div class="min-w-0">
+          <p class="canva-text m-0 text-[9px] font-bold uppercase tracking-[.12em]" style="color: rgb(113, 128, 158); font-size: 9px;">Agenda individual</p>
+          <h2 id="juan-heading" class="canva-text m-0 mt-1 font-bold" style="color: rgb(30, 46, 90); font-size: 21px;">Juan Castro</h2>
+         </div>
+        </div>
+        <span id="juan-count" class="count-pill" aria-live="polite">0 actividades</span>
+       </header>
+       <div id="juan-list" class="entry-list"></div>
+       <div id="juan-empty" class="empty-state hidden">No hay actividades registradas para hoy</div>
+       
+       <form id="juan-form" class="agenda-form admin-only hidden">
+        <input id="juan-edit-id" type="hidden">
+        <div>
+         <label class="canva-text field-label" for="juan-category" style="color: rgb(123, 137, 163);">Actividad realizada</label>
+         <select id="juan-category" class="control" required="">
+          <option value="Procedimiento">Procedimiento</option>
+          <option value="Formulario">Formulario</option>
+          <option value="Frontend">Frontend</option>
+          <option value="Backend">Backend</option>
+          <option value="Automatización">Automatización</option>
+          <option value="Diseño">Diseño</option>
+         </select>
+        </div>
+        <div class="mt-4">
+         <label class="canva-text field-label" for="juan-description" style="color: rgb(123, 137, 163);">Describe a detalle lo realizado</label>
+         <textarea id="juan-description" class="control" maxlength="700" required=""></textarea>
+        </div>
+        <p id="juan-message" class="toast hidden" aria-live="polite"></p>
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+         <button id="juan-cancel" class="canva-button secondary-button" type="button">Limpiar</button>
+         <button id="juan-save" class="canva-button primary-button" type="submit">
+          <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+          <span id="juan-save-label">Guardar actividad</span>
+         </button>
+        </div>
+       </form>
+      </article>
+
+      <article class="canva-panel agenda-panel" aria-labelledby="valentina-heading" style="background: rgb(255, 255, 255);">
+       <header class="panel-heading">
+        <div class="flex min-w-0 items-center gap-3">
+         <div class="person-avatar valentina-avatar" aria-hidden="true">VC</div>
+         <div class="min-w-0">
+          <p class="canva-text m-0 text-[9px] font-bold uppercase tracking-[.12em]" style="color: rgb(113, 128, 158); font-size: 9px;">Agenda individual</p>
+          <h2 id="valentina-heading" class="canva-text m-0 mt-1 font-bold" style="color: rgb(30, 46, 90); font-size: 21px;">Valentina Corzo</h2>
+         </div>
+        </div>
+        <span id="valentina-count" class="count-pill" aria-live="polite">0 actividades</span>
+       </header>
+       <div id="valentina-list" class="entry-list"></div>
+       <div id="valentina-empty" class="empty-state hidden">No hay actividades registradas para hoy</div>
+       
+       <form id="valentina-form" class="agenda-form admin-only hidden">
+        <input id="valentina-edit-id" type="hidden">
+        <div>
+         <label class="canva-text field-label" for="valentina-category" style="color: rgb(123, 137, 163);">Actividad realizada</label>
+         <select id="valentina-category" class="control" required="">
+          <option value="Procedimiento">Procedimiento</option>
+          <option value="Formulario">Formulario</option>
+          <option value="Frontend">Frontend</option>
+          <option value="Backend">Backend</option>
+          <option value="Automatización">Automatización</option>
+          <option value="Diseño">Diseño</option>
+         </select>
+        </div>
+        <div class="mt-4">
+         <label class="canva-text field-label" for="valentina-description" style="color: rgb(123, 137, 163);">Describe a detalle lo realizado</label>
+         <textarea id="valentina-description" class="control" maxlength="700" required=""></textarea>
+        </div>
+        <p id="valentina-message" class="toast hidden" aria-live="polite"></p>
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+         <button id="valentina-cancel" class="canva-button secondary-button" type="button">Limpiar</button>
+         <button id="valentina-save" class="canva-button primary-button pink-button" type="submit">
+          <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+          <span id="valentina-save-label">Guardar actividad</span>
+         </button>
+        </div>
+       </form>
+      </article>
+     </div>
+
+     <aside class="grid content-start gap-5" aria-label="Panel de proyectos">
+      <section class="canva-panel agenda-panel" aria-labelledby="dashboard-heading" style="background: rgb(255, 255, 255);">
+       <header class="panel-heading">
+        <div class="flex items-center gap-3">
+         <div class="project-icon" aria-hidden="true">
+          <i data-lucide="chart-no-axes-combined" class="h-4 w-4"></i>
+         </div>
+         <div>
+          <p class="canva-text m-0 text-[9px] font-bold uppercase tracking-[.12em]" style="color: rgb(113, 128, 158); font-size: 9px;">Resumen general</p>
+          <h2 id="dashboard-heading" class="canva-text m-0 mt-1 font-bold" style="color: rgb(30, 46, 90); font-size: 19px;">Dashboard de avance</h2>
+         </div>
+        </div>
+       </header>
+       <div class="dashboard-grid">
+        <div class="metric-card">
+         <p class="canva-text m-0 text-[10px] font-bold text-[#73809a]" style="color: rgb(115, 128, 154); font-size: 10px;">Proyectos activos</p>
+         <p id="projects-total" class="metric-value" aria-live="polite">0</p>
+        </div>
+        <div class="metric-card">
+         <p class="canva-text m-0 text-[10px] font-bold text-[#73809a]" style="color: rgb(115, 128, 154); font-size: 10px;">Avance promedio</p>
+         <p id="projects-progress" class="metric-value" aria-live="polite">0%</p>
+        </div>
+        <div class="metric-card col-span-2">
+         <p class="canva-text m-0 text-[10px] font-bold text-[#73809a]" style="color: rgb(115, 128, 154); font-size: 10px;">Actividades del día</p>
+         <p id="daily-total" class="metric-value" aria-live="polite">0</p>
+         <div class="mt-3 progress-track" aria-label="Avance promedio de proyectos">
+          <div id="dashboard-progress-fill" class="progress-fill"></div>
+         </div>
+        </div>
+       </div>
+      </section>
+
+      <section class="canva-panel agenda-panel" aria-labelledby="projects-heading" style="background: rgb(255, 255, 255);">
+       <header class="panel-heading">
+        <div class="flex items-center gap-3">
+         <div class="project-icon" aria-hidden="true">
+          <i data-lucide="folders" class="h-4 w-4"></i>
+         </div>
+         <div>
+          <p class="canva-text m-0 text-[9px] font-bold uppercase tracking-[.12em]" style="color: rgb(113, 128, 158); font-size: 9px;">Seguimiento</p>
+          <h2 id="projects-heading" class="canva-text m-0 mt-1 font-bold" style="color: rgb(30, 46, 90); font-size: 19px;">Proyectos</h2>
+         </div>
+        </div>
+        <span id="projects-count" class="count-pill" aria-live="polite">0 proyectos</span>
+       </header>
+       <div id="project-list" class="project-list"></div>
+       <div id="project-empty" class="empty-state hidden">Aún no hay proyectos registrados.</div>
+       
+       <form id="project-form" class="project-form admin-only hidden">
+        <input id="project-edit-id" type="hidden">
+        <div>
+         <label class="canva-text field-label" for="project-name" style="color: rgb(123, 137, 163);">Nombre del proyecto</label>
+         <input id="project-name" class="control" maxlength="100" required="">
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3">
+         <div>
+          <label class="canva-text field-label" for="project-status" style="color: rgb(123, 137, 163);">Estado</label>
+          <select id="project-status" class="control" required="">
+           <option value="Planificación">Planificación</option>
+           <option value="En progreso">En progreso</option>
+           <option value="Completado">Completado</option>
+           <option value="Pausado">Pausado</option>
+          </select>
+         </div>
+         <div>
+          <label class="canva-text field-label" for="project-progress" style="color: rgb(123, 137, 163);">Avance (%)</label>
+          <input id="project-progress" class="control" type="number" min="0" max="100" value="0" required="">
+         </div>
+        </div>
+        <p id="project-message" class="toast hidden" aria-live="polite"></p>
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+         <button id="project-cancel" class="canva-button secondary-button" type="button">Limpiar</button>
+         <button id="project-save" class="canva-button primary-button green-button" type="submit">
+          <i data-lucide="folder-plus" class="h-3.5 w-3.5"></i>
+          <span id="project-save-label">Guardar proyecto</span>
+         </button>
+        </div>
+       </form>
+      </section>
+     </aside>
+    </section>
+   </main>
+  </div>
+
+  <template id="entry-template">
+   <article class="entry-card">
+    <div class="flex items-start justify-between gap-3">
+     <div class="min-w-0">
+      <span class="entry-category category-badge"></span>
+      <p class="entry-description m-0 mt-2 whitespace-pre-wrap text-[12px] leading-relaxed text-[#51617e]"></p>
+     </div>
+     <div class="flex shrink-0 gap-1 admin-only hidden">
+      <button type="button" class="icon-button entry-edit" aria-label="Editar actividad"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button> 
+      <button type="button" class="icon-button entry-delete" aria-label="Eliminar actividad"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+     </div>
+    </div>
+    <div class="entry-confirm hidden mt-3 border-t border-[#edf0f6] pt-3 text-[10px] font-bold text-[#8b5c65]">
+      <span>¿Eliminar esta actividad?</span>
+      <button type="button" class="entry-delete-confirm ml-2 underline">Eliminar</button>
+      <button type="button" class="entry-delete-cancel ml-2 underline">Cancelar</button>
+    </div>
+   </article>
+  </template>
+
+  <template id="project-template">
+   <article class="project-card">
+    <div class="flex items-start justify-between gap-3">
+     <div class="min-w-0">
+      <p class="project-name m-0 truncate text-[13px] font-bold text-[#1e2e5a]"></p>
+      <div class="mt-2 flex items-center gap-2">
+        <span class="project-status status-badge"></span>
+        <span class="project-progress-value project-progress-text"></span>
+      </div>
+     </div>
+     <div class="flex shrink-0 gap-1 admin-only hidden">
+      <button type="button" class="icon-button project-edit" aria-label="Editar proyecto"><i data-lucide="pencil" class="h-3.5 w-3.5"></i></button>
+      <button type="button" class="icon-button project-delete" aria-label="Eliminar proyecto"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>
+     </div>
+    </div>
+    <div class="mt-3 progress-track">
+     <div class="project-progress-fill progress-fill"></div>
+    </div>
+    <div class="project-confirm hidden mt-3 border-t border-[#edf0f6] pt-3 text-[10px] font-bold text-[#8b5c65]">
+      <span>¿Eliminar este proyecto?</span>
+      <button type="button" class="project-delete-confirm ml-2 underline">Eliminar</button>
+      <button type="button" class="project-delete-cancel ml-2 underline">Cancelar</button>
+    </div>
+   </article>
+  </template>
+
+  <script>
+    // Inicialización de Supabase con tus credenciales
+    const supabaseUrl = "https://fuvtruimzmutbjlqpfad.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1dnRydWltem11dGJqbGtxcGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxMTUxNzAsImV4cCI6MjA5OTY5MTE3MH0.l0hXZUyAYtM0eo8ochaHUNRKETya6wqWebF6sJ7kvis";
+    const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Detección del Rol de Administrador
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAdmin = urlParams.get('admin') === 'true';
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      lucide.createIcons();
+
+      // Ajustar visibilidad de botones e inputs según el Rol
+      if (isAdmin) {
+        document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+      }
+
+      const state = {
+        actividades: [],
+        proyectos: [],
+        selectedDate: localDateString(new Date()),
+        busy: false
+      };
+
+      const users = {
+        juan: "Juan Castro",
+        valentina: "Valentina Corzo"
+      };
+
+      function localDateString(date) {
+        const offset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+      }
+
+      function formatDate(iso) {
+        return new Date(iso + "T12:00:00").toLocaleDateString("es-VE", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+        });
+      }
+
+      function getDayCarouselDates() {
+        const today = new Date();
+        const dates = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(today);
+          date.setDate(date.getDate() - i);
+          dates.push(localDateString(date));
+        }
+        return dates;
+      }
+
+      function renderDayCarousel() {
+        const carousel = document.getElementById("day-carousel");
+        const dates = getDayCarouselDates();
+        const buttons = new Map([...carousel.children].map(button => [button.dataset.date, button]));
+        const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+        dates.forEach(dateStr => {
+          const date = new Date(dateStr + "T12:00:00");
+          let button = buttons.get(dateStr);
+
+          if (!button) {
+            button = document.createElement("button");
+            button.type = "button";
+            button.className = "day-button";
+            button.dataset.date = dateStr;
+            button.innerHTML = '<span class="day-name"></span><span class="day-num"></span>';
+            button.addEventListener("click", () => selectDate(dateStr));
+            carousel.appendChild(button);
+          }
+
+          button.querySelector(".day-name").textContent = dayNames[date.getDay()];
+          button.querySelector(".day-num").textContent = date.getDate();
+          button.classList.toggle("active", dateStr === state.selectedDate);
+          buttons.delete(dateStr);
+        });
+
+        buttons.forEach(button => button.remove());
+      }
+
+      function selectDate(dateStr) {
+        state.selectedDate = dateStr;
+        document.getElementById("selected-date-label").textContent = formatDate(dateStr);
+        if (isAdmin) {
+          resetForm("juan");
+          resetForm("valentina");
+        }
+        renderDayCarousel();
+        fetchData();
+      }
+
+      function showMessage(id, text, type) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.textContent = text;
+        element.className = "toast " + type;
+      }
+
+      function clearMessage(id) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.textContent = "";
+        element.className = "toast hidden";
+      }
+
+      function setFormBusy(key, busy) {
+        if (!isAdmin) return;
+        const ids = key === "project"
+          ? ["project-save", "project-cancel", "project-name", "project-status", "project-progress"]
+          : [key + "-save", key + "-cancel", key + "-category", key + "-description"];
+        ids.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = busy;
+        });
+      }
+
+      function categoryClass(category) {
+        const map = {
+          "Formulario": "category-formulario",
+          "Procedimiento": "category-procedimiento",
+          "Frontend": "category-frontend",
+          "Backend": "category-backend",
+          "Automatización": "category-automatizacion",
+          "Diseño": "category-diseno"
+        };
+        return map[category] || "category-formulario";
+      }
+
+      function statusClass(status) {
+        const map = {
+          "Planificación": "status-planificacion",
+          "En progreso": "status-en-progreso",
+          "Completado": "status-completado",
+          "Pausado": "status-pausado"
+        };
+        return map[status] || "status-planificacion";
+      }
+
+      // --- LEER DE SUPABASE ---
+      async function fetchData() {
+        // Cargar Actividades del día actual
+        const { data: actData, error: actErr } = await _supabase
+          .from('actividades')
+          .select('*')
+          .eq('fecha', state.selectedDate)
+          .order('creado_el', { ascending: true });
+
+        // Cargar todos los proyectos
+        const { data: projData, error: projErr } = await _supabase
+          .from('proyectos')
+          .select('*')
+          .order('creado_el', { ascending: true });
+
+        if (!actErr && actData) state.actividades = actData;
+        if (!projErr && projData) state.proyectos = projData;
+
+        renderAll();
+      }
+
+      function createEntry(record, key) {
+        const fragment = document.getElementById("entry-template").content.cloneNode(true);
+        const card = fragment.querySelector(".entry-card");
+        card.dataset.id = record.id;
+
+        const badge = card.querySelector(".entry-category");
+        badge.textContent = record.categoria;
+        badge.classList.add(categoryClass(record.categoria));
+        card.querySelector(".entry-description").textContent = record.descripcion;
+
+        if (isAdmin) {
+          card.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+          const editButton = card.querySelector(".entry-edit");
+          const deleteButton = card.querySelector(".entry-delete");
+          const confirmation = card.querySelector(".entry-confirm");
+
+          editButton.addEventListener("click", () => startActivityEdit(record, key));
+          deleteButton.addEventListener("click", () => {
+            deleteButton.classList.add("hidden");
+            confirmation.classList.remove("hidden");
+          });
+          card.querySelector(".entry-delete-cancel").addEventListener("click", () => {
+            deleteButton.classList.remove("hidden");
+            confirmation.classList.add("hidden");
+          });
+          card.querySelector(".entry-delete-confirm").addEventListener("click", () => deleteActivity(record.id, key));
+        }
+
+        return card;
+      }
+
+      function createProject(record) {
+        const fragment = document.getElementById("project-template").content.cloneNode(true);
+        const card = fragment.querySelector(".project-card");
+        card.dataset.id = record.id;
+
+        const progress = Math.max(0, Math.min(100, Number(record.progreso) || 0));
+        const status = card.querySelector(".project-status");
+        status.textContent = record.estado || "Planificación";
+        status.classList.add(statusClass(record.estado));
+        card.querySelector(".project-name").textContent = record.nombre;
+        card.querySelector(".project-progress-value").textContent = progress + "%";
+        card.querySelector(".project-progress-fill").style.width = progress + "%";
+
+        if (isAdmin) {
+          card.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+          const editButton = card.querySelector(".project-edit");
+          const deleteButton = card.querySelector(".project-delete");
+          const confirmation = card.querySelector(".project-confirm");
+
+          editButton.addEventListener("click", () => startProjectEdit(record));
+          deleteButton.addEventListener("click", () => {
+            deleteButton.classList.add("hidden");
+            confirmation.classList.remove("hidden");
+          });
+          card.querySelector(".project-delete-cancel").addEventListener("click", () => {
+            deleteButton.classList.remove("hidden");
+            confirmation.classList.add("hidden");
+          });
+          card.querySelector(".project-delete-confirm").addEventListener("click", () => deleteProject(record.id));
+        }
+
+        return card;
+      }
+
+      function renderActivityList(key, userFullName) {
+        const list = document.getElementById(key + "-list");
+        list.innerHTML = "";
+        
+        const filtered = state.actividades.filter(act => act.usuario === userFullName);
+
+        filtered.forEach(record => {
+          list.appendChild(createEntry(record, key));
+        });
+
+        document.getElementById(key + "-empty").classList.toggle("hidden", filtered.length > 0);
+        document.getElementById(key + "-count").textContent = filtered.length + (filtered.length === 1 ? " actividad" : " actividades");
+      }
+
+      function renderProjects() {
+        const list = document.getElementById("project-list");
+        list.innerHTML = "";
+
+        state.proyectos.forEach(record => {
+          list.appendChild(createProject(record));
+        });
+
+        document.getElementById("project-empty").classList.toggle("hidden", state.proyectos.length > 0);
+        document.getElementById("projects-count").textContent = state.proyectos.length + (state.proyectos.length === 1 ? " proyecto" : " proyectos");
+      }
+
+      function renderDashboard() {
+        const totalActivities = state.actividades.length;
+        const average = state.proyectos.length
+          ? Math.round(state.proyectos.reduce((sum, p) => sum + (Number(p.progreso) || 0), 0) / state.proyectos.length)
+          : 0;
+
+        document.getElementById("projects-total").textContent = state.proyectos.length;
+        document.getElementById("projects-progress").textContent = average + "%";
+        document.getElementById("daily-total").textContent = totalActivities;
+        document.getElementById("dashboard-progress-fill").style.width = average + "%";
+      }
+
+      function renderAll() {
+        renderActivityList("juan", users.juan);
+        renderActivityList("valentina", users.valentina);
+        renderProjects();
+        renderDashboard();
+        lucide.createIcons();
+      }
+
+      function resetForm(key) {
+        if (!isAdmin) return;
+        document.getElementById(key + "-form").reset();
+        document.getElementById(key + "-edit-id").value = "";
+
+        if (key === "project") {
+          document.getElementById("project-status").value = "Planificación";
+          document.getElementById("project-progress").value = 0;
+          document.getElementById("project-save-label").textContent = "Guardar proyecto";
+        } else {
+          document.getElementById(key + "-category").value = "Procedimiento";
+          document.getElementById(key + "-save-label").textContent = "Guardar actividad";
+        }
+        clearMessage(key + "-message");
+      }
+
+      function startActivityEdit(record, key) {
+        document.getElementById(key + "-edit-id").value = record.id;
+        document.getElementById(key + "-category").value = record.categoria;
+        document.getElementById(key + "-description").value = record.descripcion;
+        document.getElementById(key + "-save-label").textContent = "Actualizar actividad";
+        clearMessage(key + "-message");
+        document.getElementById(key + "-description").focus();
+      }
+
+      function startProjectEdit(record) {
+        document.getElementById("project-edit-id").value = record.id;
+        document.getElementById("project-name").value = record.nombre || "";
+        document.getElementById("project-status").value = record.estado || "Planificación";
+        document.getElementById("project-progress").value = record.progreso || 0;
+        document.getElementById("project-save-label").textContent = "Actualizar proyecto";
+        clearMessage("project-message");
+        document.getElementById("project-name").focus();
+      }
+
+      // --- OPERACIONES DE BORRADO ---
+      async function deleteActivity(id, key) {
+        if (state.busy) return;
+        state.busy = true;
+        setFormBusy(key, true);
+        showMessage(key + "-message", "Eliminando actividad...", "success");
+
+        const { error } = await _supabase
+          .from('actividades')
+          .delete()
+          .eq('id', id);
+
+        state.busy = false;
+        setFormBusy(key, false);
+
+        if (error) {
+          showMessage(key + "-message", "No se pudo eliminar. Intenta de nuevo.", "error");
+        } else {
+          resetForm(key);
+          fetchData();
+        }
+      }
+
+      async function deleteProject(id) {
+        if (state.busy) return;
+        state.busy = true;
+        setFormBusy("project", true);
+        showMessage("project-message", "Eliminando proyecto...", "success");
+
+        const { error } = await _supabase
+          .from('proyectos')
+          .delete()
+          .eq('id', id);
+
+        state.busy = false;
+        setFormBusy("project", false);
+
+        if (error) {
+          showMessage("project-message", "No se pudo eliminar. Intenta de nuevo.", "error");
+        } else {
+          resetForm("project");
+          fetchData();
+        }
+      }
+
+      // --- CREACIÓN / EDICIÓN ---
+      async function handleActivitySubmit(event, key, userFullName) {
+        event.preventDefault();
+        if (state.busy) return;
+
+        const editId = document.getElementById(key + "-edit-id").value;
+        const description = document.getElementById(key + "-description").value.trim();
+        const category = document.getElementById(key + "-category").value;
+
+        if (!description) return;
+
+        state.busy = true;
+        setFormBusy(key, true);
+        showMessage(key + "-message", editId ? "Actualizando..." : "Guardando...", "success");
+
+        let response;
+        if (editId) {
+          response = await _supabase
+            .from('actividades')
+            .update({ categoria: category, descripcion: description })
+            .eq('id', editId);
+        } else {
+          response = await _supabase
+            .from('actividades')
+            .insert([{ fecha: state.selectedDate, usuario: userFullName, categoria: category, descripcion: description }]);
+        }
+
+        state.busy = false;
+        setFormBusy(key, false);
+
+        if (response.error) {
+          showMessage(key + "-message", "Error al guardar. Intenta de nuevo.", "error");
+        } else {
+          resetForm(key);
+          fetchData();
+        }
+      }
+
+      async function handleProjectSubmit(event) {
+        event.preventDefault();
+        if (state.busy) return;
+
+        const editId = document.getElementById("project-edit-id").value;
+        const name = document.getElementById("project-name").value.trim();
+        const status = document.getElementById("project-status").value;
+        const progress = Math.max(0, Math.min(100, Number(document.getElementById("project-progress").value) || 0));
+
+        if (!name) return;
+
+        state.busy = true;
+        setFormBusy("project", true);
+        showMessage("project-message", editId ? "Actualizando..." : "Guardando...", "success");
+
+        let response;
+        if (editId) {
+          response = await _supabase
+            .from('proyectos')
+            .update({ nombre: name, estado: status, progreso: progress })
+            .eq('id', editId);
+        } else {
+          response = await _supabase
+            .from('proyectos')
+            .insert([{ nombre: name, estado: status, progreso: progress }]);
+        }
+
+        state.busy = false;
+        setFormBusy("project", false);
+
+        if (response.error) {
+          showMessage("project-message", "Error al guardar. Intenta de nuevo.", "error");
+        } else {
+          resetForm("project");
+          fetchData();
+        }
+      }
+
+      // Event Listeners para formularios
+      if (isAdmin) {
+        document.getElementById("juan-form").addEventListener("submit", event => handleActivitySubmit(event, "juan", users.juan));
+        document.getElementById("valentina-form").addEventListener("submit", event => handleActivitySubmit(event, "valentina", users.valentina));
+        document.getElementById("project-form").addEventListener("submit", handleProjectSubmit);
+
+        document.getElementById("juan-cancel").addEventListener("click", () => resetForm("juan"));
+        document.getElementById("valentina-cancel").addEventListener("click", () => resetForm("valentina"));
+        document.getElementById("project-cancel").addEventListener("click", () => resetForm("project"));
+      }
+
+      // Carga Inicial
+      selectDate(state.selectedDate);
+    });
+  </script>
+</body>
+</html>
